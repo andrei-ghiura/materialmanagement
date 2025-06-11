@@ -1,7 +1,25 @@
 const labels = {
   tab1: "Materiale",
-  tab2: "Prelucrate",
-  tab3: "Trimise",
+  tab2: "Materiale prelucrate",
+  tab3: "Materiale livrate",
+  stare: "Stare",
+  tip: "Tip",
+  confirm: "Confirma",
+  detaliiMaterial: "Detalii material",
+  descriere: "Descriere",
+  nume: "Nume",
+  createdAt: "Creat la",
+  updatedAt: "Modificat la",
+  componente: "Componente",
+  filtruStare: "Filtru stare",
+  filtruData: "Filtru data",
+  demo: "DEMO",
+  scan: "Scaneaza QR",
+  adauga: "Adauga material",
+  detalii: "Detalii material",
+  sterge: "Sterge material",
+  adaugaComponenta: "Adauga componenta prin scanare QR",
+  exportEticheta: "Exporta eticheta",
 };
 
 export default labels;

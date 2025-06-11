@@ -1,64 +1,64 @@
 const mockMaterials = [
     {
-        "nume": "Panou 14",
-        "tip": "Panou OSB",
-        "misc": "20x20x12",
-        "id": 1746630671759
+        id: "MAT-001A",
+        nume: "Panou 14",
+        descriere: "Panou OSB pentru constructii.",
+        tip: "Materie prima",
+        stare: "Receptionat",
+        createdAt: "2025-06-01T10:00:00Z",
+        updatedAt: "2025-06-01T10:00:00Z",
+        componente: [],
     },
     {
-        "nume": "Scândură 322",
-        "tip": "Scândură",
-        "misc": "30kg",
-        "id": 1746630702331
+        id: "MAT-002B",
+        nume: "Scândura 322",
+        descriere: "Scândura de lemn pentru rame.",
+        tip: "Materie prima",
+        stare: "In lucru",
+        createdAt: "2025-06-02T11:00:00Z",
+        updatedAt: "2025-06-03T09:00:00Z",
+        componente: [],
     },
     {
-        "nume": "Placă 1",
-        "tip": "Placă de gips-carton",
-        "misc": "10x10x1",
-        "id": 1746630702332
+        id: "MAT-003C",
+        nume: "Placa 1",
+        descriere: "Placa de gips-carton pentru pereti interiori.",
+        tip: "Materie prima",
+        stare: "Livrat",
+        createdAt: "2025-06-03T12:00:00Z",
+        updatedAt: "2025-06-04T08:00:00Z",
+        componente: [],
     },
     {
-        "nume": "Panou 15",
-        "tip": "Panou PAL",
-        "misc": "15x15x2",
-        "id": 1746630702333
+        id: "MAT-004D",
+        nume: "Panou 15 Bun De test",
+        descriere: "Panou PAL pentru mobilier.",
+        tip: "Material prelucrat",
+        stare: "Receptionat",
+        createdAt: "2025-06-04T13:00:00Z",
+        updatedAt: "2025-06-04T13:00:00Z",
+        componente: ["MAT-001A", "MAT-002B", "MAT-006F"],
     },
     {
-        "nume": "Scândură 323",
-        "tip": "Scândură",
-        "misc": "25kg",
-        "id": 1746630702334
+        id: "MAT-005E",
+        nume: "Scândura 323",
+        descriere: "Scândura pentru structuri.",
+        tip: "Materie prima",
+        stare: "Receptionat",
+        createdAt: "2025-06-05T14:00:00Z",
+        updatedAt: "2025-06-05T14:00:00Z",
+        componente: [],
     },
     {
-        "nume": "Placă 2",
-        "tip": "Placă de fibră de lemn",
-        "misc": "12x12x1",
-        "id": 1746630702335
+        id: "MAT-006F",
+        nume: "Placa 2",
+        descriere: "Placa de fibra de lemn.",
+        tip: "Material prelucrat",
+        stare: "In lucru",
+        createdAt: "2025-06-06T15:00:00Z",
+        updatedAt: "2025-06-07T10:00:00Z",
+        componente: ["MAT-003C"],
     },
-    {
-        "nume": "Panou 16",
-        "tip": "Panou MDF",
-        "misc": "18x18x3",
-        "id": 1746630702336
-    },
-    {
-        "nume": "Scândură 324",
-        "tip": "Scândură",
-        "misc": "35kg",
-        "id": 1746630702337
-    },
-    {
-        "nume": "Placă 3",
-        "tip": "Placă de fibră de sticlă",
-        "misc": "14x14x2",
-        "id": 1746630702338
-    },
-    {
-        "nume": "Panou 17",
-        "tip": "Panou CPL",
-        "misc": "20x20x4",
-        "id": 1746630702339
-    }
 ];
 
 export default mockMaterials;

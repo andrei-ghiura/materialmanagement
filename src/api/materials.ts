@@ -25,17 +25,41 @@ store.create();
 const resetStore = async () => {
     store.set('materials', mockMaterials);
 };
+function generateAlphanumericId() {
+    // Generates a unique alphanumeric ID like MAT-XXXX
+    return (
+        'MAT-' + Math.random().toString(36).substr(2, 4).toUpperCase() + Date.now().toString(36).substr(-2).toUpperCase()
+    );
+}
 const save = async (materialData: any) => {
     const materials = await store.get('materials') || [];
+    const now = new Date().toISOString();
     if (materialData.id) {
         const index = materials.findIndex((material: any) => material.id === materialData.id);
         if (index !== -1) {
-            materials[index] = materialData;
+            materials[index] = {
+                ...materials[index],
+                ...materialData,
+                updatedAt: now,
+            };
         } else {
-            materials.push(materialData);
+            materials.push({
+                ...materialData,
+                updatedAt: now,
+                createdAt: now,
+            });
         }
     } else {
-        materials.push({ ...materialData, id: Date.now() });
+        materials.push({
+            id: generateAlphanumericId(),
+            nume: materialData.nume || '',
+            descriere: materialData.descriere || '',
+            tip: materialData.tip || 'Materie prima',
+            stare: materialData.stare || 'Receptionat',
+            componente: materialData.componente || [],
+            createdAt: now,
+            updatedAt: now,
+        });
     }
     return await store.set('materials', materials);
 }

@@ -44,52 +44,81 @@ const MaterialComponents = () => {
     }
 
     const exportPDF = async () => {
-        const doc = new jsPDF();
-        let y = 10;
-        doc.setFontSize(16);
-        doc.text(`${labels.componente} pentru ${material?.nume}`, 10, y);
-        y += 10;
-
-        // Helper to draw a table
-        function drawTable(header: string, rows: Material[], startY: number) {
-            let tableY = startY;
-            doc.setFontSize(14);
-            doc.text(header, 10, tableY);
-            tableY += 8;
-            doc.setFontSize(11);
-            // Table headers
-            doc.setFillColor(230, 230, 230);
-            doc.rect(10, tableY - 5, 190, 8, 'F');
-            doc.text('Nume', 12, tableY);
-            doc.text('Tip', 72, tableY);
-            doc.text('Descriere', 112, tableY);
-            tableY += 7;
-            if (rows.length === 0) {
-                doc.text('Nicio componenta gasita.', 12, tableY);
-                tableY += 8;
-            } else {
-                rows.forEach((comp) => {
-                    doc.text(comp.nume || '', 12, tableY);
-                    doc.text(comp.tip || '', 72, tableY);
-                    doc.text(comp.descriere || '', 112, tableY, { maxWidth: 85 });
-                    tableY += 7;
-                    if (tableY > 280) {
-                        doc.addPage();
-                        tableY = 10;
-                    }
-                });
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'A4' });
+        let y = 40;
+        // Industrial header
+        doc.setFillColor(251, 191, 36); // industrial yellow
+        doc.rect(0, 0, 842, 60, 'F'); // A4 landscape width = 842pt
+        doc.setFontSize(22);
+        doc.setTextColor(34, 34, 59);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Bill of Materials: ${material?.nume || ''} (${material?.id || ''})`, 40, 38);
+        y = 80;
+        // Table columns (wider for landscape)
+        const columns = [
+            { header: 'ID', dataKey: 'id', width: 90 },
+            { header: 'Name', dataKey: 'nume', width: 170 },
+            { header: 'Type', dataKey: 'tip', width: 90 },
+            { header: 'Status', dataKey: 'stare', width: 90 },
+            { header: 'Description', dataKey: 'descriere', width: 270 },
+            { header: 'Prime/Processed', dataKey: 'prime', width: 90 },
+        ];
+        // Gather all components (prime and processed)
+        const allRows: any[] = [];
+        processedComponents.forEach((comp) => {
+            allRows.push({ ...comp, prime: 'Processed' });
+        });
+        primeComponents.forEach((comp) => {
+            allRows.push({ ...comp, prime: 'Prime' });
+        });
+        // Table header styling
+        const tableX = 40;
+        let tableY = y;
+        doc.setFontSize(13);
+        doc.setDrawColor(34, 34, 59);
+        doc.setLineWidth(1.2);
+        // Draw header row
+        let colX = tableX;
+        doc.setFillColor(229, 231, 235); // light gray
+        columns.forEach(col => {
+            doc.rect(colX, tableY, col.width, 32, 'F');
+            doc.setTextColor(30, 41, 59);
+            doc.setFont('helvetica', 'bold');
+            doc.text(col.header, colX + 10, tableY + 21); // 10pt left padding, vertically centered
+            colX += col.width;
+        });
+        tableY += 32;
+        // Draw rows
+        doc.setFont('helvetica', 'normal');
+        allRows.forEach((row, idx) => {
+            colX = tableX;
+            if (idx % 2 === 0) {
+                doc.setFillColor(254, 249, 195); // highlight yellow
+                doc.rect(colX, tableY, columns.reduce((a, b) => a + b.width, 0), 28, 'F');
             }
-            return tableY + 4;
-        }
-
-        y = drawTable('Materiale prelucrate', processedComponents, y);
-        y = drawTable('Materiale prime', primeComponents, y);
-
+            columns.forEach(col => {
+                doc.setTextColor(34, 34, 59);
+                doc.setFont('helvetica', col.dataKey === 'id' ? 'bold' : 'normal');
+                let text = String(row[col.dataKey] || '');
+                if (col.dataKey === 'descriere') {
+                    text = text.length > 90 ? text.slice(0, 87) + '...' : text;
+                }
+                // Add left and right padding, and vertical centering
+                doc.text(text, colX + 10, tableY + 19, { maxWidth: col.width - 20 });
+                doc.rect(colX, tableY, col.width, 28);
+                colX += col.width;
+            });
+            tableY += 28;
+            if (tableY > 570) { // landscape A4 height
+                doc.addPage();
+                tableY = 40;
+            }
+        });
+        // Save or export
+        const fileName = `bill_of_materials_${material?.nume || material?.id || 'export'}.pdf`;
         if (Capacitor.getPlatform() === 'android') {
-            // Save PDF using Capacitor Filesystem
             const pdfOutput = doc.output('datauristring');
             const base64 = pdfOutput.split(',')[1];
-            const fileName = `componente_${material?.nume || material?.id || 'export'}.pdf`;
             try {
                 await Filesystem.writeFile({
                     path: fileName,
@@ -102,7 +131,7 @@ const MaterialComponents = () => {
                 alert('Eroare la salvarea PDF-ului.');
             }
         } else {
-            doc.save(`componente_${material?.nume || material?.id || 'export'}.pdf`);
+            doc.save(fileName);
         }
     };
 

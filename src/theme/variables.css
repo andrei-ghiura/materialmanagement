@@ -1,0 +1,32 @@
+/* For information on how to create your own theme, please see:
+http://ionicframework.com/docs/theming/ */
+
+/* Modernized color scheme */
+:root {
+  --ion-color-primary: #4caf50; /* Modern green */
+  --ion-color-secondary: #ff9800; /* Vibrant orange */
+  --ion-color-tertiary: #03a9f4; /* Bright blue */
+  --ion-color-light: #f5f5f5; /* Light gray */
+  --ion-color-dark: #212121; /* Dark gray */
+  --ion-font-family: 'Roboto', sans-serif; /* Modern font */
+}
+
+/* Updated typography */
+body {
+  font-family: var(--ion-font-family);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Modern button styles */
+ion-button {
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Card styles */
+ion-card {
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}

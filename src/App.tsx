@@ -1,8 +1,7 @@
-import { Redirect, Route } from 'react-router-dom';
+import { Route } from 'react-router-dom';
 import {
   IonApp,
   IonRouterOutlet,
-  IonTabs,
   setupIonicReact
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
@@ -39,7 +38,6 @@ import '@ionic/react/css/palettes/dark.system.css';
 
 /* Theme variables */
 import './theme/variables.css';
-import labels from './labels';
 
 setupIonicReact();
 
@@ -50,7 +48,7 @@ const App: React.FC = () => (
         <Route exact path="/">
           <Tab1 />
         </Route>
-        <Route exact path="/material/:id">
+        <Route exact path="/material/:id?">
           <MaterialView />
         </Route>
         <Route exact path="/material/:id/components">

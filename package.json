@@ -14,6 +14,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@capacitor-community/file-opener": "^7.0.1",
     "@capacitor-mlkit/barcode-scanning": "^7.2.1",
     "@capacitor/android": "^7.3.0",
     "@capacitor/app": "7.0.1",
@@ -21,6 +22,7 @@
     "@capacitor/filesystem": "^7.1.1",
     "@capacitor/haptics": "7.0.1",
     "@capacitor/keyboard": "7.0.1",
+    "@capacitor/local-notifications": "^7.0.1",
     "@capacitor/status-bar": "7.0.1",
     "@ionic/react": "^8.5.0",
     "@ionic/react-router": "^8.5.0",
@@ -28,6 +30,7 @@
     "@types/react-router": "^5.1.20",
     "@types/react-router-dom": "^5.3.3",
     "axios": "^1.9.0",
+    "cordova-plugin-file-opener2": "^4.0.0",
     "drizzle-orm": "^0.43.1",
     "ionicons": "^7.4.0",
     "jspdf": "^3.0.1",

@@ -17,6 +17,7 @@
 
 import { Storage } from '@ionic/storage';
 import mockMaterials from './mockMaterials';
+import { Material } from '../types';
 
 const store = new Storage();
 store.create();
@@ -31,11 +32,11 @@ function generateAlphanumericId() {
         'MAT-' + Math.random().toString(36).substr(2, 4).toUpperCase() + Date.now().toString(36).substr(-2).toUpperCase()
     );
 }
-const save = async (materialData: any) => {
+const save = async (materialData: Material) => {
     const materials = await store.get('materials') || [];
     const now = new Date().toISOString();
     if (materialData.id) {
-        const index = materials.findIndex((material: any) => material.id === materialData.id);
+        const index = materials.findIndex((material: Material) => material.id === materialData.id);
         if (index !== -1) {
             materials[index] = {
                 ...materials[index],
@@ -66,9 +67,9 @@ const save = async (materialData: any) => {
 const getAll = async () => {
     return await store.get('materials');
 }
-const deleteMaterial = async (materialData) => {
+const deleteMaterial = async (materialData: Material) => {
     const materials = await store.get('materials') || [];
-    const index = materials.findIndex((material: any) => material.id === materialData.id);
+    const index = materials.findIndex((material: Material) => material.id === materialData.id);
     if (index !== -1) {
         materials.splice(index, 1);
     }

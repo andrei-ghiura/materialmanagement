@@ -1,25 +1,24 @@
-import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonPage, IonTitle, IonToolbar, useIonAlert, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonGrid, IonRow, IonCol, IonSelect, IonSelectOption } from '@ionic/react';
+import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonPage, IonTitle, IonToolbar, useIonAlert, IonSelect, IonSelectOption } from '@ionic/react';
 import './Tab1.css';
 import labels from '../labels';
 import { add, qrCode } from 'ionicons/icons';
 import { Barcode, BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
-import { useEffect, useRef, useState } from 'react';
-import { getAll, resetStore, save } from '../api/materials';
-import { useIonRouter } from '@ionic/react';
+import { useEffect, useState } from 'react';
+import { getAll, resetStore } from '../api/materials';
+import { useIonRouter, useIonViewWillEnter } from '@ionic/react';
+import { Material } from '../types';
 
 
 
 const Tab1: React.FC = () => {
-  const [newItemData, setNewItemData] = useState({});
-  const [isSupported, setisSupported] = useState(false)
-  const [barcodes, setBarcodes] = useState<Barcode[]>([]);
+  const [, setisSupported] = useState(false)
+  const [, setBarcodes] = useState<Barcode[]>([]);
   const [presentAlert] = useIonAlert();
   const router = useIonRouter();
 
   const [materials, setMaterials] = useState([])
   const [selectedState, setSelectedState] = useState('');
   const [dateFilter, setDateFilter] = useState<[Date, Date] | null>(null);
-  const modal = useRef<HTMLIonModalElement>(null);
   useEffect(() => {
     BarcodeScanner.isSupported().then((result) => {
       setisSupported(result.supported);
@@ -47,7 +46,7 @@ const Tab1: React.FC = () => {
           if (data && data.id) {
             id = data.id;
           }
-        } catch (e) {
+        } catch {
 
           // Not JSON, treat as plain id string
           if (rawValue) {
@@ -58,7 +57,7 @@ const Tab1: React.FC = () => {
       if (id) {
         // Validate if material exists
         const materials = await getAll();
-        const found = materials && materials.find((m: any) => m.id === id);
+        const found = materials && materials.find((m: Material) => m.id === id);
         if (found) {
           router.push(`/material/${id}`, 'forward', 'push');
           return;
@@ -79,9 +78,7 @@ const Tab1: React.FC = () => {
       buttons: ['OK'],
     });
   }
-  const [message, setMessage] = useState(
-    'This modal example uses triggers to automatically open a modal when the button is clicked.'
-  );
+
   const requestPermissions = async (): Promise<boolean> => {
     const { camera } = await BarcodeScanner.requestPermissions();
     return camera === 'granted' || camera === 'limited';
@@ -95,25 +92,17 @@ const Tab1: React.FC = () => {
     });
   }
 
-  function onModalClose(toSave: boolean) {
-    if (toSave) {
-      save(newItemData)
-    }
-    modal.current?.dismiss().finally(() => {
-      setNewItemData({});
-      loadData();
-    })
 
-  }
   const loadData = async () => {
     getAll().then((res) => {
       return res
     }).then((data) => setMaterials(data)).catch((error) => console.log(error));
   }
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  useIonViewWillEnter(() => {
+    loadData();
+  });
+
   return (
     <IonPage>
       <IonHeader>
@@ -147,14 +136,14 @@ const Tab1: React.FC = () => {
         </IonItem>
         <IonItem>
           <IonLabel>{labels.filtruData}</IonLabel>
-          <IonInput type="date" onIonChange={e => setDateFilter([new Date(e.detail.value), dateFilter ? dateFilter[1] : new Date()])} />
-          <IonInput type="date" onIonChange={e => setDateFilter([dateFilter ? dateFilter[0] : new Date(), new Date(e.detail.value)])} />
+          <IonInput type="date" onIonChange={e => setDateFilter([new Date(e.detail.value ?? ''), dateFilter ? dateFilter[1] : new Date()])} />
+          <IonInput type="date" onIonChange={e => setDateFilter([dateFilter ? dateFilter[0] : new Date(), e.detail.value ? new Date(e.detail.value) : new Date()])} />
         </IonItem>
         <IonList>
-          {materials?.filter((material: any) =>
+          {materials?.filter((material: Material) =>
             (!selectedState || material.stare === selectedState) &&
             (!dateFilter || (new Date(material.createdAt) >= dateFilter[0] && new Date(material.createdAt) <= dateFilter[1]))
-          ).map((material: any) => (
+          ).map((material: Material) => (
             <IonItem button detail={true} key={material.id}
               onClick={() => { router.push(`/material/${material.id}`, 'forward', 'push'); }}>
               <IonLabel>
@@ -170,7 +159,7 @@ const Tab1: React.FC = () => {
         </IonList>
       </IonContent>
       <IonFab slot="fixed" vertical="bottom" horizontal="end" id="open-modal">
-        <IonFabButton>
+        <IonFabButton onClick={() => { router.push('/material/', 'forward', 'push'); }}>
           <IonIcon icon={add}></IonIcon>
         </IonFabButton>
       </IonFab>

@@ -1,36 +1,46 @@
 import { IonHeader, IonToolbar, IonButtons, IonButton, IonTitle, IonContent, IonItem, IonInput, IonTextarea, IonSelect, IonFooter, useIonAlert, IonCard, IonCardHeader, IonCardContent, IonSelectOption, IonLabel, IonPage, IonGrid, IonRow, IonCol, IonFab, IonFabButton } from "@ionic/react";
 import QRious from "qrious";
-import { Barcode, BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
+import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { useEffect, useState } from "react";
 import { deleteMaterial, getAll, save } from "../api/materials";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Capacitor } from '@capacitor/core';
 import { useHistory, useParams } from 'react-router-dom';
 import labels from '../labels';
+import { Material } from "../types";
+
+
 
 const MaterialView = () => {
     const history = useHistory();
     const { id } = useParams<{ id: string }>();
     const [, setisSupported] = useState(false)
-    const [barcodes, setBarcodes] = useState<Barcode[]>([]);
     const [presentAlert] = useIonAlert();
     const [componente, setComponente] = useState<string[]>([]);
-    const [allMaterials, setAllMaterials] = useState<any[]>([]);
-    const [material, setMaterial] = useState<any>({});
+    const [allMaterials, setAllMaterials] = useState<Material[]>([]);
+    const [material, setMaterial] = useState<Material>({
+        id: '',
+        nume: '',
+        tip: '',
+        stare: '',
+        descriere: '',
+        createdAt: '',
+        updatedAt: '',
+        componente: [],
+    });
     useEffect(() => {
         BarcodeScanner.isSupported().then((result) => {
             setisSupported(result.supported);
         });
         getAll().then((materials) => {
             setAllMaterials(materials);
-            const found = materials.find((m: any) => m.id === id);
+            const found = materials.find((m: Material) => m.id === id);
             setMaterial(found || {});
             setComponente(found?.componente || []);
         });
     }, [id]);
 
     useEffect(() => {
-        setBarcodes([]);
         setComponente(material.componente || []);
     }, [material]);
 
@@ -45,7 +55,7 @@ const MaterialView = () => {
             if (scannedBarcodes.length > 0) {
                 const rawData = scannedBarcodes[0].displayValue || '';
                 try {
-                    const scannedData = JSON.parse(rawData.replace(/[\u0000-\u001F\u007F-\u009F]/g, ''));
+                    const scannedData = JSON.parse(rawData);
                     if (scannedData.id) {
                         setComponente(prev => [...prev, scannedData.id]);
                         const updatedMaterial = {
@@ -58,13 +68,13 @@ const MaterialView = () => {
                     } else {
                         alert('QR-ul nu contine un material valid.');
                     }
-                } catch (parseError) {
+                } catch {
                     alert('QR invalid.');
                 }
             } else {
                 alert('Niciun QR detectat.');
             }
-        } catch (error) {
+        } catch {
             alert('Eroare la scanare.');
         }
     }
@@ -187,7 +197,7 @@ const MaterialView = () => {
         context.fillText("Material Details", startX, yPosition);
         yPosition += rowHeight;
         context.font = "20px Arial";
-        tableData.filter(([key, value]) => key == 'id' || key == 'nume').forEach(([key, value]) => {
+        tableData.filter(([key]) => key == 'id' || key == 'nume').forEach(([key, value]) => {
             context.fillText(`${key}:`, startX, yPosition);
             context.fillText(`${value}`, startX + 150, yPosition);
             yPosition += rowHeight;
@@ -205,7 +215,7 @@ const MaterialView = () => {
         });
         yPosition += 28;
         context.font = "16px Arial";
-        components.forEach((row) => {
+        components.forEach((row: string[]) => {
             row.forEach((cell, i) => {
                 if (i === 0) {
                     context.fillStyle = "#007bff"; // Blue for ID
@@ -235,7 +245,8 @@ const MaterialView = () => {
             await save(updatedMaterial);
             setMaterial(updatedMaterial);
             alert('Material salvat cu succes!');
-        } catch (error) {
+            history.push('/'); // Navigate to main screen after saving
+        } catch {
             alert('Eroare la salvare.');
         }
     };
@@ -272,7 +283,7 @@ const MaterialView = () => {
                                         <IonInput
                                             label={labels.nume}
                                             value={material.nume}
-                                            onIonInput={(ev) => setMaterial({ ...material, nume: ev.target.value })}
+                                            onIonInput={(ev) => setMaterial({ ...material, nume: ev.target.value as string || '' })}
                                             labelPlacement="stacked"
                                             type="text"
                                         />
@@ -287,7 +298,7 @@ const MaterialView = () => {
                                         <IonTextarea
                                             label={labels.descriere}
                                             value={material.descriere}
-                                            onIonInput={(ev) => setMaterial({ ...material, descriere: ev.target.value })}
+                                            onIonInput={(ev) => setMaterial({ ...material, descriere: ev.target.value || '' })}
                                             labelPlacement="stacked"
                                             placeholder="Descriere material, detalii, etc."
                                             rows={4}

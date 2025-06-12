@@ -1,5 +1,5 @@
 import { IonHeader, IonToolbar, IonButtons, IonButton, IonTitle, IonContent, IonItem, IonInput, IonTextarea, IonSelect, IonFooter, useIonAlert, IonCard, IonCardHeader, IonCardContent, IonSelectOption, IonLabel, IonPage, IonGrid, IonRow, IonCol, IonFab, IonFabButton } from "@ionic/react";
-import { QRious } from "react-qrious";
+import { QRious } from "qrious";
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { useEffect, useState } from "react";
 import { deleteMaterial, getAll, save } from "../api/materials";

@@ -36,7 +36,7 @@ const Tab1: React.FC = () => {
 
     // Try to extract material id from QR code data and validate existence
     if (barcodes && barcodes.length > 0) {
-      let id = null;
+      let id: string | null = null;
       let rawValue = barcodes[0].rawValue;
       if (typeof rawValue === 'string') {
         rawValue = rawValue.trim();

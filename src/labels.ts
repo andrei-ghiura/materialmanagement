@@ -1,4 +1,5 @@
 const labels = {
+  add: "Adauga",
   tab1: "Materiale",
   tab2: "Materiale prelucrate",
   tab3: "Materiale livrate",

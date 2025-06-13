@@ -1,4 +1,4 @@
-import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonPage, IonTitle, IonToolbar, useIonAlert, IonSelect, IonSelectOption } from '@ionic/react';
+import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonPage, IonTitle, IonToolbar, useIonAlert, IonSelect, IonSelectOption, IonAccordion, IonAccordionGroup } from '@ionic/react';
 import './Tab1.css';
 import labels from '../labels';
 import { add, qrCode } from 'ionicons/icons';
@@ -18,7 +18,11 @@ const Tab1: React.FC = () => {
 
   const [materials, setMaterials] = useState([])
   const [selectedState, setSelectedState] = useState('');
-  const [dateFilter, setDateFilter] = useState<[Date, Date] | null>(null);
+  const today = new Date();
+  const lastWeeks = new Date();
+  lastWeeks.setDate(today.getDate() - 14);
+  const [dateFrom, setDateFrom] = useState<string | null>(lastWeeks.toISOString().split('T')[0]);
+  const [dateTo, setDateTo] = useState<string | null>(today.toISOString().split('T')[0]);
   useEffect(() => {
     BarcodeScanner.isSupported().then((result) => {
       setisSupported(result.supported);
@@ -110,9 +114,11 @@ const Tab1: React.FC = () => {
           <IonTitle>{labels.tab1}</IonTitle>
 
           <IonButtons slot="end">
-            <IonButton onClick={() => scan()}>{labels.scan}
-              <IonIcon ios={qrCode} md={qrCode}></IonIcon>
+            <IonButton onClick={() => { router.push('/material/', 'forward', 'push'); }}>
+              {labels.add}
+              <IonIcon icon={add}></IonIcon>
             </IonButton>
+
             <IonButton onClick={() => { resetStore().then(() => loadData()) }}>{labels.demo}
             </IonButton>
           </IonButtons>
@@ -125,24 +131,37 @@ const Tab1: React.FC = () => {
           </IonToolbar>
         </IonHeader>
 
-        <IonItem>
-          <IonLabel>{labels.filtruStare}</IonLabel>
-          <IonSelect value={selectedState} placeholder="Alege starea" onIonChange={e => setSelectedState(e.detail.value)}>
-            <IonSelectOption value="">Toate</IonSelectOption>
-            <IonSelectOption value="Receptionat">Receptionat</IonSelectOption>
-            <IonSelectOption value="In lucru">In lucru</IonSelectOption>
-            <IonSelectOption value="Livrat">Livrat</IonSelectOption>
-          </IonSelect>
-        </IonItem>
-        <IonItem>
-          <IonLabel>{labels.filtruData}</IonLabel>
-          <IonInput type="date" onIonChange={e => setDateFilter([new Date(e.detail.value ?? ''), dateFilter ? dateFilter[1] : new Date()])} />
-          <IonInput type="date" onIonChange={e => setDateFilter([dateFilter ? dateFilter[0] : new Date(), e.detail.value ? new Date(e.detail.value) : new Date()])} />
-        </IonItem>
+        <IonAccordionGroup>
+          <IonAccordion value="filters">
+            <IonItem slot="header">
+              <IonLabel>Filtre</IonLabel>
+            </IonItem>
+            <div className="ion-padding" slot="content">
+              <IonItem>
+                <IonLabel>{labels.filtruStare}</IonLabel>
+                <IonSelect value={selectedState} placeholder="Alege starea" onIonChange={e => setSelectedState(e.detail.value)}>
+                  <IonSelectOption value="">Toate</IonSelectOption>
+                  <IonSelectOption value="Receptionat">Receptionat</IonSelectOption>
+                  <IonSelectOption value="In lucru">In lucru</IonSelectOption>
+                  <IonSelectOption value="Livrat">Livrat</IonSelectOption>
+                </IonSelect>
+              </IonItem>
+              <IonItem>
+                <IonLabel position="stacked">Data de la</IonLabel>
+                <IonInput type="date" value={dateFrom ?? ''} onIonChange={e => setDateFrom(e.detail.value ?? null)} />
+              </IonItem>
+              <IonItem>
+                <IonLabel position="stacked">Data până la</IonLabel>
+                <IonInput type="date" value={dateTo ?? ''} onIonChange={e => setDateTo(e.detail.value ?? null)} />
+              </IonItem>
+            </div>
+          </IonAccordion>
+        </IonAccordionGroup>
         <IonList>
           {materials?.filter((material: Material) =>
             (!selectedState || material.stare === selectedState) &&
-            (!dateFilter || (new Date(material.createdAt) >= dateFilter[0] && new Date(material.createdAt) <= dateFilter[1]))
+            (!dateFrom || new Date(material.createdAt) >= new Date(dateFrom)) &&
+            (!dateTo || new Date(material.createdAt) <= new Date(dateTo))
           ).map((material: Material) => (
             <IonItem button detail={true} key={material.id}
               onClick={() => { router.push(`/material/${material.id}`, 'forward', 'push'); }}>
@@ -159,8 +178,8 @@ const Tab1: React.FC = () => {
         </IonList>
       </IonContent>
       <IonFab slot="fixed" vertical="bottom" horizontal="end" id="open-modal">
-        <IonFabButton onClick={() => { router.push('/material/', 'forward', 'push'); }}>
-          <IonIcon icon={add}></IonIcon>
+        <IonFabButton onClick={() => { scan() }}>
+          <IonIcon ios={qrCode} md={qrCode}></IonIcon>
         </IonFabButton>
       </IonFab>
     </IonPage >

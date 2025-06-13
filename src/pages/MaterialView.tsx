@@ -1,20 +1,21 @@
 import { IonHeader, IonToolbar, IonButtons, IonButton, IonTitle, IonContent, IonItem, IonInput, IonTextarea, IonSelect, IonFooter, useIonAlert, IonCard, IonCardHeader, IonCardContent, IonSelectOption, IonLabel, IonPage, IonGrid, IonRow, IonCol, IonFab, IonFabButton } from "@ionic/react";
-import { QRious } from "qrious";
+import QRious from "qrious";
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { Prompt } from 'react-router-dom';
 import { deleteMaterial, getAll, save } from "../api/materials";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Capacitor } from '@capacitor/core';
 import { useHistory, useParams } from 'react-router-dom';
 import labels from '../labels';
 import { Material } from "../types";
+import { makeLabelCanvas } from "../components/makeLabelCanvas";
 
 
 
 const MaterialView = () => {
     const history = useHistory();
     const { id } = useParams<{ id: string }>();
-    const [, setisSupported] = useState(false)
     const [presentAlert] = useIonAlert();
     const [componente, setComponente] = useState<string[]>([]);
     const [allMaterials, setAllMaterials] = useState<Material[]>([]);
@@ -28,110 +29,89 @@ const MaterialView = () => {
         updatedAt: '',
         componente: [],
     });
+    const [labelImageUrl, setLabelImageUrl] = useState("");
+    const labelCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+    const [pendingNavigation, setPendingNavigation] = useState<null | (() => void)>(null);
+    const [unsaved, setUnsaved] = useState(false);
+    const initialMaterialRef = useRef<Material | null>(null);
+
     useEffect(() => {
-        BarcodeScanner.isSupported().then((result) => {
-            setisSupported(result.supported);
-        });
         getAll().then((materials) => {
             setAllMaterials(materials);
             const found = materials.find((m: Material) => m.id === id);
             setMaterial(found || {});
             setComponente(found?.componente || []);
+            initialMaterialRef.current = found || null;
         });
     }, [id]);
+
+    // Track unsaved changes
+    useEffect(() => {
+        if (!initialMaterialRef.current) return;
+        const isChanged = JSON.stringify({ ...material, componente }) !== JSON.stringify({ ...initialMaterialRef.current, componente: initialMaterialRef.current.componente });
+        setUnsaved(isChanged);
+    }, [material, componente]);
+
+    // Intercept browser back/refresh
+    useEffect(() => {
+        const handler = (e: BeforeUnloadEvent) => {
+            if (unsaved) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', handler);
+        return () => window.removeEventListener('beforeunload', handler);
+    }, [unsaved]);
+
+    // Intercept in-app navigation
+    const handleNav = (navFn: () => void) => {
+        if (unsaved) {
+            setPendingNavigation(() => navFn);
+            handleLeaveConfirm();
+        } else {
+            navFn();
+        }
+    }
 
     useEffect(() => {
         setComponente(material.componente || []);
     }, [material]);
 
+    // Generate label image when material or material.id changes
+    useEffect(() => {
+        if (!material || !material.id) return;
+        (async () => {
+            const canvas = await makeLabelCanvas(material.id);
+            if (canvas) {
+                labelCanvasRef.current = canvas;
+                setLabelImageUrl(canvas.toDataURL("image/png"));
+            }
+        })();
+    }, [material]);
+
     const scan = async () => {
-        const granted = await requestPermissions();
-        if (!granted) {
-            presentDenyAlert();
-            return;
-        }
         try {
-            const { barcodes: scannedBarcodes } = await BarcodeScanner.scan();
-            if (scannedBarcodes.length > 0) {
-                const rawData = scannedBarcodes[0].displayValue || '';
-                try {
-                    const scannedData = JSON.parse(rawData);
-                    if (scannedData.id) {
-                        setComponente(prev => [...prev, scannedData.id]);
-                        const updatedMaterial = {
-                            ...material,
-                            componente: [...(componente || []), scannedData.id],
-                        };
-                        await save(updatedMaterial);
-                        setMaterial(updatedMaterial);
-                        alert('Componenta adaugata cu succes!');
-                    } else {
-                        alert('QR-ul nu contine un material valid.');
-                    }
-                } catch {
-                    alert('QR invalid.');
-                }
+            const { barcodes } = await BarcodeScanner.scan();
+            const rawData = barcodes[0]?.displayValue || '';
+            const scannedData = JSON.parse(rawData);
+            if (scannedData.id) {
+                const updated = {
+                    ...material,
+                    componente: [...(componente || []), scannedData.id],
+                };
+                await save(updated);
+                setMaterial(updated);
+                alert('Componenta adaugata cu succes!');
             } else {
-                alert('Niciun QR detectat.');
+                alert('QR-ul nu contine un material valid.');
             }
         } catch {
             alert('Eroare la scanare.');
         }
     }
-
-    const requestPermissions = async (): Promise<boolean> => {
-        const { camera } = await BarcodeScanner.requestPermissions();
-        return camera === 'granted' || camera === 'limited';
-    }
-
-    const presentDenyAlert = async (): Promise<void> => {
-        await presentAlert({
-            header: 'Permission denied',
-            message: 'Please grant camera permission to use the barcode scanner.',
-            buttons: ['OK'],
-        });
-    }
-    const requestStoragePermissions = async () => {
-        if (Capacitor.getPlatform() === 'android') {
-            const { Filesystem } = await import('@capacitor/filesystem');
-
-            try {
-                const permissionStatus = await Filesystem.checkPermissions();
-
-                if (permissionStatus.publicStorage !== 'granted') {
-                    const userConfirmed = await new Promise((resolve) => {
-                        presentAlert({
-                            header: 'Storage Permission Required',
-                            message: 'This app needs storage permission to save files. Do you want to grant permission?',
-                            buttons: [
-                                {
-                                    text: 'Cancel',
-                                    role: 'cancel',
-                                    handler: () => resolve(false),
-                                },
-                                {
-                                    text: 'Grant',
-                                    handler: () => resolve(true),
-                                },
-                            ],
-                        });
-                    });
-
-                    if (!userConfirmed) {
-                        throw new Error('Storage permission not granted');
-                    }
-
-                    const result = await Filesystem.requestPermissions();
-                    if (result.publicStorage !== 'granted') {
-                        throw new Error('Storage permission not granted');
-                    }
-                }
-            } catch (error) {
-                console.error('Error checking or requesting storage permissions:', error);
-                throw error;
-            }
-        }
-    };
 
     const downloadQRImage = async (canvas: HTMLCanvasElement, fileName: string) => {
         const dataUrl = canvas.toDataURL('image/png');
@@ -139,7 +119,7 @@ const MaterialView = () => {
         if (Capacitor.getPlatform() === 'web') {
             // For web platform, create a download link
             const link = document.createElement('a');
-            link.download = fileName || `QR_Code_${Date.now()}.png`;
+            link.download = fileName;
             link.href = dataUrl;
             document.body.appendChild(link);
             link.click();
@@ -147,194 +127,99 @@ const MaterialView = () => {
         } else {
             // For native platforms (Android), use Filesystem API
             const base64Data = dataUrl.split(',')[1];
-            await requestStoragePermissions();
-            try {
-                const validFileName = fileName || `QR_Code_${Date.now()}.png`;
-                const directory = Directory.Documents;
-                await Filesystem.writeFile({
-                    path: validFileName,
-                    data: base64Data,
-                    directory: directory,
-                    recursive: true,
-                });
-                alert('QR code saved successfully!');
-            } catch (error) {
-                console.error('Error saving QR code:', error);
-                alert('Failed to save QR code. Please check permissions and storage availability.');
-            }
+            await Filesystem.writeFile({
+                path: fileName,
+                data: base64Data,
+                directory: Directory.Documents,
+                recursive: true,
+            });
+            alert('QR code saved successfully!');
         }
     };
-
-    const makeQR = (your_data: string) => {
-        const qrcodeContainer = document.getElementById("qrcode");
-        if (!qrcodeContainer) return;
-
-        // Vertical label layout constants
-        const labelWidth = 420;
-        const labelHeight = 540;
-        const borderRadius = 16;
-        const borderColor = '#22223b';
-        const borderWidth = 5;
-        const headerHeight = 56;
-        const padding = 28;
-        const qrSize = 160;
-        const accentColor = '#1e293b';
-        const headerBg = '#fbbf24';
-        const headerText = '#22223b';
-        const tableHeaderBg = '#e5e7eb';
-        const tableHeaderColor = '#1e293b';
-        const tableBorder = '#cbd5e1';
-        const tableFont = 'bold 15px Arial';
-        const tableHeaderFont = 'bold 15px Arial';
-        const highlightBg = '#fef9c3';
-        const sectionTitleFont = 'bold 16px Arial';
-        const tableColWidths = [70, 120, 90, 70];
-        const tableRowHeight = 36;
-
-        // Parse data and prepare components
-        const parsedData = JSON.parse(your_data);
-        const components = (parsedData.componente || []).map((compId: string) => {
-            const comp = allMaterials.find((m) => m.id === compId);
-            return comp ? [comp.id, comp.nume, comp.tip, comp.stare] : [compId, '', '', ''];
-        });
-
-        // Canvas
-        const canvas = document.createElement('canvas');
-        canvas.width = labelWidth;
-        canvas.height = labelHeight;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        // Card background and border
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.moveTo(borderRadius, 0);
-        ctx.lineTo(labelWidth - borderRadius, 0);
-        ctx.quadraticCurveTo(labelWidth, 0, labelWidth, borderRadius);
-        ctx.lineTo(labelWidth, labelHeight - borderRadius);
-        ctx.quadraticCurveTo(labelWidth, labelHeight, labelWidth - borderRadius, labelHeight);
-        ctx.lineTo(borderRadius, labelHeight);
-        ctx.quadraticCurveTo(0, labelHeight, 0, labelHeight - borderRadius);
-        ctx.lineTo(0, borderRadius);
-        ctx.quadraticCurveTo(0, 0, borderRadius, 0);
-        ctx.closePath();
-        ctx.fill();
-        ctx.lineWidth = borderWidth;
-        ctx.strokeStyle = borderColor;
-        ctx.stroke();
-
-        // Header bar (title: name and id)
-        ctx.fillStyle = headerBg;
-        ctx.fillRect(0, 0, labelWidth, headerHeight);
-        ctx.font = 'bold 24px Arial';
-        ctx.fillStyle = headerText;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(`${parsedData.nume || ''} (${parsedData.id || ''})`, labelWidth / 2, headerHeight / 2);
-
-        // QR code centered
-        const qrTempCanvas = document.createElement('canvas');
-        new QRious({
-            element: qrTempCanvas,
-            value: your_data,
-            size: qrSize,
-            background: 'transparent',
-            padding: 0,
-        });
-        // Draw white rounded rect behind QR
-        ctx.save();
-        ctx.fillStyle = '#fff';
-        const qrX = (labelWidth - qrSize) / 2;
-        const qrY = headerHeight + 32;
-        const qrBgRadius = 16;
-        ctx.beginPath();
-        ctx.moveTo(qrX + qrBgRadius, qrY);
-        ctx.lineTo(qrX + qrSize - qrBgRadius, qrY);
-        ctx.quadraticCurveTo(qrX + qrSize, qrY, qrX + qrSize, qrY + qrBgRadius);
-        ctx.lineTo(qrX + qrSize, qrY + qrSize - qrBgRadius);
-        ctx.quadraticCurveTo(qrX + qrSize, qrY + qrSize, qrX + qrSize - qrBgRadius, qrY + qrSize);
-        ctx.lineTo(qrX + qrBgRadius, qrY + qrSize);
-        ctx.quadraticCurveTo(qrX, qrY + qrSize, qrX, qrY + qrSize - qrBgRadius);
-        ctx.lineTo(qrX, qrY + qrBgRadius);
-        ctx.quadraticCurveTo(qrX, qrY, qrX + qrBgRadius, qrY);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-        ctx.drawImage(qrTempCanvas, qrX, qrY, qrSize, qrSize);
-
-        // Components table section
-        let tableY = qrY + qrSize + 32;
-        ctx.font = sectionTitleFont;
-        ctx.fillStyle = accentColor;
-        ctx.textAlign = 'left';
-        ctx.fillText('Components', padding, tableY);
-        tableY += 10;
-        // Table header
-        ctx.font = tableHeaderFont;
-        ctx.textAlign = 'center';
-        let colX = padding;
-        ['ID', 'Name', 'Type', 'Status'].forEach((header, i) => {
-            ctx.fillStyle = tableHeaderBg;
-            ctx.fillRect(colX, tableY, tableColWidths[i], tableRowHeight);
-            ctx.strokeStyle = tableBorder;
-            ctx.strokeRect(colX, tableY, tableColWidths[i], tableRowHeight);
-            ctx.fillStyle = tableHeaderColor;
-            ctx.fillText(header, colX + tableColWidths[i] / 2, tableY + tableRowHeight / 2 + 2);
-            colX += tableColWidths[i];
-        });
-        tableY += tableRowHeight;
-        // Table rows
-        ctx.font = tableFont;
-        if (components.length > 0) {
-            components.forEach((row, idx) => {
-                colX = padding;
-                if (idx % 2 === 0) {
-                    ctx.fillStyle = highlightBg;
-                    ctx.fillRect(colX, tableY, tableColWidths.reduce((a, b) => a + b, 0), tableRowHeight);
-                }
-                row.forEach((cell, i) => {
-                    ctx.strokeStyle = tableBorder;
-                    ctx.strokeRect(colX, tableY, tableColWidths[i], tableRowHeight);
-                    ctx.fillStyle = i === 0 ? accentColor : '#22223b';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(cell, colX + tableColWidths[i] / 2, tableY + tableRowHeight / 2 + 2);
-                    colX += tableColWidths[i];
-                });
-                tableY += tableRowHeight;
-            });
-        } else {
-            ctx.fillStyle = '#64748b';
-            ctx.textAlign = 'left';
-            ctx.fillText('No components', padding, tableY + tableRowHeight / 2 + 2);
-        }
-
-        qrcodeContainer.appendChild(canvas);
-        downloadQRImage(canvas, `${parsedData.id || parsedData.nume || 'material'}_${parsedData.tip || 'qr'}.png`);
-    }
 
     const handleConfirm = async () => {
-        try {
-            const updatedMaterial = {
-                ...material,
-                componente: componente,
-            };
-            await save(updatedMaterial);
-            setMaterial(updatedMaterial);
+        await save({ ...material, componente });
+        setUnsaved(false);
+        if (pendingNavigation) {
+            setShowLeaveConfirm(false);
+            const nav = pendingNavigation;
+            setPendingNavigation(null);
+            nav();
+        } else {
             alert('Material salvat cu succes!');
-            history.push('/'); // Navigate to main screen after saving
-        } catch {
-            alert('Eroare la salvare.');
+            history.push('/');
         }
     };
-
+    const handleDownload = () => {
+        if (labelCanvasRef.current) {
+            const fileName = `${material.id || material.nume || 'material'}_${new Date().toISOString().split('.')[0].replace(/[:-]/g, '_')}.png`;
+            downloadQRImage(labelCanvasRef.current, fileName);
+        }
+    };
     if (!material) return null;
+
+    // Delete confirmation using presentAlert
+    const handleDelete = () => {
+        presentAlert({
+            header: 'Confirmare ștergere',
+            message: 'Sigur vrei să ștergi acest material?',
+            buttons: [
+                {
+                    text: 'Anulează',
+                    role: 'cancel',
+                },
+                {
+                    text: 'Da, șterge materialul',
+                    role: 'destructive',
+                    handler: async () => {
+                        await deleteMaterial(material);
+                        history.goBack();
+                    },
+                },
+            ],
+        });
+    };
+
+    // Leave confirmation using presentAlert
+    const handleLeaveConfirm = () => {
+        presentAlert({
+            header: 'Modificări nesalvate',
+            message: 'Ai modificări nesalvate. Ce vrei să faci?',
+            buttons: [
+                {
+                    text: 'Rămâi pe pagină',
+                    role: 'cancel',
+                },
+                {
+                    text: 'Părăsește fără salvare',
+                    role: 'destructive',
+                    handler: () => {
+                        setUnsaved(false);
+                        if (pendingNavigation) {
+                            const nav = pendingNavigation;
+                            setPendingNavigation(null);
+                            nav();
+                        }
+                    },
+                },
+                {
+                    text: 'Salvează și pleacă',
+                    handler: async () => {
+                        await handleConfirm();
+                    },
+                },
+            ],
+        });
+    };
 
     return (
         <IonPage>
+            {/* Prompt for browser navigation (react-router-dom v5) */}
+            {unsaved && <Prompt when={unsaved} message={() => false} />}
             <IonHeader>
                 <IonToolbar>
                     <IonButtons slot="start">
-                        <IonButton fill="clear" onClick={() => history.goBack()}>
+                        <IonButton fill="clear" onClick={() => handleNav(() => history.goBack())}>
                             <span style={{ fontSize: 20 }}>←</span>
                         </IonButton>
                     </IonButtons>
@@ -346,100 +231,107 @@ const MaterialView = () => {
                     </IonButtons>
                 </IonToolbar>
             </IonHeader>
-            <IonContent className="ion-padding" style={{ background: '#f6f8fa' }}>
-                <IonGrid>
-                    <IonRow>
-                        <IonCol size="12" sizeMd="8" offsetMd="2">
-                            <IonCard style={{ boxShadow: '0 2px 12px #0001', borderRadius: 16 }}>
-                                <IonCardHeader style={{ fontSize: 22, fontWeight: 700, borderBottom: '1px solid #eee' }}>
-                                    {labels.detaliiMaterial}
-                                </IonCardHeader>
-                                <IonCardContent>
-                                    <IonItem lines="none">
-                                        <IonInput
-                                            label={labels.nume}
-                                            value={material.nume}
-                                            onIonInput={(ev) => setMaterial({ ...material, nume: ev.target.value as string || '' })}
-                                            labelPlacement="stacked"
-                                            type="text"
-                                        />
-                                    </IonItem>
-                                    <IonItem lines="none">
-                                        <IonSelect value={material.tip} label={labels.tip} onIonChange={(ev) => setMaterial({ ...material, tip: ev.detail.value })}>
-                                            <IonSelectOption value="Materie prima">Materie prima</IonSelectOption>
-                                            <IonSelectOption value="Material prelucrat">Material prelucrat</IonSelectOption>
-                                        </IonSelect>
-                                    </IonItem>
-                                    <IonItem lines="none">
-                                        <IonTextarea
-                                            label={labels.descriere}
-                                            value={material.descriere}
-                                            onIonInput={(ev) => setMaterial({ ...material, descriere: ev.target.value || '' })}
-                                            labelPlacement="stacked"
-                                            placeholder="Descriere material, detalii, etc."
-                                            rows={4}
-                                        />
-                                    </IonItem>
-                                    <IonItem lines="none">
-                                        <IonSelect value={material.stare} label={labels.stare} onIonChange={(ev) => setMaterial({ ...material, stare: ev.detail.value })}>
-                                            <IonSelectOption value="Receptionat">Receptionat</IonSelectOption>
-                                            <IonSelectOption value="In lucru">In lucru</IonSelectOption>
-                                            <IonSelectOption value="Livrat">Livrat</IonSelectOption>
-                                        </IonSelect>
-                                    </IonItem>
-                                </IonCardContent>
-                            </IonCard>
-                            <IonCard >
-                                <IonCardHeader>
-                                    {labels.componente}
-                                </IonCardHeader>
-                                <IonCardContent>
-                                    {componente?.length === 0 && (
-                                        <IonLabel color="medium">Nicio componenta adaugata.</IonLabel>
-                                    )}
-                                    {componente?.map((compId: string, index: number) => {
+            <IonContent className="ion-padding bg-[#f6f8fa] min-h-screen pb-20">
+                <div className="flex flex-col items-center w-full">
+                    <div className="flex flex-col flex-wrap w-full max-w-[480px] gap-6 material-flex-container md:flex-row md:max-w-[1100px] md:gap-10 md:items-start xl:max-w-[1600px] xl:gap-16 xl:py-8">
+                        <IonCard className="mb-0 min-w-[45%]">
+                            <h2 className="text-[22px] font-bold mt-4 mb-2 pl-3 pt-2">{labels.detaliiMaterial}</h2>
+                            <div className="bg-transparent rounded-none p-3 shadow-none">
+                                <IonItem lines="none">
+                                    <IonInput
+                                        label={labels.nume}
+                                        value={material.nume}
+                                        onIonInput={(ev) => setMaterial({ ...material, nume: ev.target.value as string || '' })}
+                                        labelPlacement="stacked"
+                                        type="text"
+                                    />
+                                </IonItem>
+                                <IonItem lines="none">
+                                    <IonSelect value={material.tip} label={labels.tip} onIonChange={(ev) => setMaterial({ ...material, tip: ev.detail.value })}>
+                                        <IonSelectOption value="Materie prima">Materie prima</IonSelectOption>
+                                        <IonSelectOption value="Material prelucrat">Material prelucrat</IonSelectOption>
+                                    </IonSelect>
+                                </IonItem>
+                                <IonItem lines="none">
+                                    <IonTextarea
+                                        label={labels.descriere}
+                                        value={material.descriere}
+                                        onIonInput={(ev) => setMaterial({ ...material, descriere: ev.target.value || '' })}
+                                        labelPlacement="stacked"
+                                        placeholder="Descriere material, detalii, etc."
+                                        rows={4}
+                                    />
+                                </IonItem>
+                                <IonItem lines="none">
+                                    <IonSelect value={material.stare} label={labels.stare} onIonChange={(ev) => setMaterial({ ...material, stare: ev.detail.value })}>
+                                        <IonSelectOption value="Receptionat">Receptionat</IonSelectOption>
+                                        <IonSelectOption value="In lucru">In lucru</IonSelectOption>
+                                        <IonSelectOption value="Livrat">Livrat</IonSelectOption>
+                                    </IonSelect>
+                                </IonItem>
+                            </div>
+                        </IonCard>
+                        <IonCard className="mb-0 min-w-[45%]">
+                            <h3 className="text-[18px] font-semibold mt-4 mb-2 pl-3 pt-2">{labels.componente}</h3>
+                            <div className="bg-transparent rounded-none p-3 shadow-none">
+                                {componente?.length === 0 ? (
+                                    <IonLabel color="medium">Nicio componenta adaugata.</IonLabel>
+                                ) : (
+                                    componente.map((compId: string, index: number) => {
                                         const comp = allMaterials.find((m) => m.id === compId);
                                         return (
-                                            <IonItem button detail={true} key={index} onClick={() => history.push(`/material/${compId}`)} lines="full" >
+                                            <IonItem button detail key={index} onClick={() => history.push(`/material/${compId}`)} lines="full" >
                                                 <IonLabel>
-                                                    <h3 style={{ margin: 0 }}>{comp?.nume || compId}</h3>
-                                                    <p style={{ margin: 0 }}>{comp?.tip || ''}</p>
-                                                    <span style={{ fontSize: 13 }}>{comp?.descriere || ''}</span>
+                                                    <h3 className="m-0">{compId}</h3>
+                                                    <p className="m-0">{comp?.nume || ''}</p>
                                                 </IonLabel>
                                             </IonItem>
                                         );
-                                    })}
-                                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
-                                        <IonButton color="primary" shape="round" onClick={scan}>
-                                            <span style={{ fontWeight: 600 }}>{labels.adaugaComponenta}</span>
-                                        </IonButton>
-                                    </div>
-                                </IonCardContent>
-                            </IonCard>
-                            <div id="qrcode" style={{ marginTop: 32, textAlign: 'center', overflowX: 'auto', whiteSpace: 'nowrap' }}></div>
-                        </IonCol>
-                    </IonRow>
-                </IonGrid>
-                <IonFab vertical="bottom" horizontal="end" slot="fixed">
-                    <IonFabButton color="tertiary" onClick={() => makeQR(JSON.stringify(material))}>
-                        <span style={{ fontSize: 22 }}>⎙</span>
-                    </IonFabButton>
-                </IonFab>
+                                    })
+                                )}
+                                <div className="flex justify-center mt-4">
+                                    <IonButton color="primary" shape="round" onClick={scan}>
+                                        <span className="font-semibold">{labels.adaugaComponenta}</span>
+                                    </IonButton>
+                                </div>
+                            </div>
+                        </IonCard>
+                        <IonCard className="mb-0 min-w-[45%]">
+                            <div
+                                id="qrcode"
+                                className="mt-6 w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl 2xl:max-w-2xl text-center flex justify-center items-center flex-col gap-4"
+                                style={{ width: '100%' }}
+                            >
+                                {labelImageUrl && (
+                                    <img
+                                        src={labelImageUrl}
+                                        alt="Printable label"
+                                        className="w-full h-auto max-w-full border border-gray-300 rounded-lg object-contain"
+                                        style={{ maxWidth: '100%', height: 'auto' }}
+                                    />
+                                )}
+                            </div>
+                        </IonCard>
+                    </div>
+                </div>
             </IonContent>
             <IonFooter>
                 <IonToolbar>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: 8 }}>
-                        <IonButton color="danger" onClick={() => {
-                            deleteMaterial(material).then(() => {
-                                history.goBack();
-                            })
-                        }}>
-                            {labels.sterge}
+                    <IonButtons slot="start">
+                        <IonButton color="danger" onClick={handleDelete}>
+                            <span className="text-xl" role="img" aria-label="delete">🗑️</span>
+                            Șterge
                         </IonButton>
-                        <IonButton color="medium" onClick={() => history.push(`/material/${material.id}/components`)}>
-                            Vezi toate componentele
+                        <IonButton color="tertiary" onClick={handleDownload}>
+                            <span style={{ fontSize: 22 }} role="img" aria-label="print">⎙</span>
+                            QR
                         </IonButton>
-                    </div>
+                    </IonButtons>
+                    <IonButtons slot="end">
+                        <IonButton color="medium" onClick={() => handleNav(() => history.push(`/material/${material.id}/components`))}>
+                            Export
+                        </IonButton>
+                    </IonButtons>
                 </IonToolbar>
             </IonFooter>
         </IonPage>

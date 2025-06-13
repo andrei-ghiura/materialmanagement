@@ -1,4 +1,4 @@
-import { IonHeader, IonToolbar, IonButtons, IonButton, IonTitle, IonContent, IonItem, IonLabel, IonPage, IonList, IonCard, IonCardHeader, IonCardContent, useIonViewWillEnter } from "@ionic/react";
+import { IonHeader, IonToolbar, IonButtons, IonButton, IonTitle, IonContent, IonItem, IonLabel, IonPage, IonList, useIonViewWillEnter } from "@ionic/react";
 import { useParams, useHistory } from "react-router-dom";
 import { useState } from "react";
 import { getAll } from "../api/materials";
@@ -166,54 +166,36 @@ const MaterialComponents = () => {
                 </IonToolbar>
             </IonHeader>
             <IonContent className="ion-padding">
-                <IonButton expand="block" color="tertiary" onClick={exportPDF} style={{ marginBottom: 16 }}>
+                <IonButton expand="block" color="tertiary" onClick={exportPDF} className="mb-4"> {/* MODIFIED: Added Tailwind class for margin */}
                     Exporta lista ca PDF
                 </IonButton>
-                <IonCard>
-                    <IonCardHeader>
-                        {labels.componente} (Materiale prelucrate)
-                    </IonCardHeader>
-                    <IonCardContent>
-                        {processedComponents.length === 0 && (
-                            <IonLabel color="medium">Nicio componenta prelucrata gasita.</IonLabel>
-                        )}
-                        <IonList>
-                            {processedComponents.map((comp) => (
-                                <IonItem button detail={true} key={comp.id} onClick={() => history.push(`/material/${comp.id}`)}>
-                                    <IonLabel>
-                                        <h3 style={{ margin: 0 }}>{comp.nume}</h3>
-                                        <p style={{ margin: 0 }}>{comp.tip}</p>
-                                        <span style={{ fontSize: 13 }}>{comp.descriere}</span>
-                                    </IonLabel>
-                                </IonItem>
-                            ))}
-                        </IonList>
-                    </IonCardContent>
-                </IonCard>
-                <IonCard>
-                    <IonCardHeader>
-                        Materiale prime
-                    </IonCardHeader>
-                    <IonCardContent>
-                        {primeComponents.length === 0 && (
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4"> {/* MODIFIED: Added grid layout */}
+                    {/* Materiale prime */}
+                    <div className="bg-white rounded-lg shadow p-4"> {/* MODIFIED: Replaced IonCard with styled div */}
+                        <h3 className="text-lg font-semibold mb-2">Materiale prime</h3> {/* MODIFIED: Adjusted font size and margin */}
+                        {primeComponents.length === 0 ? (
                             <IonLabel color="medium">Nicio materie prima gasita.</IonLabel>
+                        ) : (
+                            <IonList>
+                                {primeComponents.map((comp) => (
+                                    <IonItem button detail={true} key={comp.id} onClick={() => history.push(`/material/${comp.id}`)} className="py-2"> {/* MODIFIED: Adjusted padding */}
+                                        <IonLabel>
+                                            <h3 className="text-sm font-medium m-0">{comp.nume}</h3> {/* MODIFIED: Adjusted font size */}
+                                            <p className="text-xs text-gray-500 m-0">{comp.tip}</p> {/* MODIFIED: Adjusted font size and color */}
+                                            <span className="text-xs text-gray-400">{comp.descriere}</span> {/* MODIFIED: Adjusted font size and color */}
+                                        </IonLabel>
+                                    </IonItem>
+                                ))}
+                            </IonList>
                         )}
-                        <IonList>
-                            {primeComponents.map((comp) => (
-                                <IonItem button detail={true} key={comp.id} onClick={() => history.push(`/material/${comp.id}`)}>
-                                    <IonLabel>
-                                        <h3 style={{ margin: 0 }}>{comp.nume}</h3>
-                                        <p style={{ margin: 0 }}>{comp.tip}</p>
-                                        <span style={{ fontSize: 13 }}>{comp.descriere}</span>
-                                    </IonLabel>
-                                </IonItem>
-                            ))}
-                        </IonList>
-                    </IonCardContent>
-                </IonCard>
+                    </div>
+
+
+                </div>
             </IonContent>
         </IonPage>
     );
-};
+}
 
 export default MaterialComponents;

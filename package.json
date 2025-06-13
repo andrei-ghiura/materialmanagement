@@ -32,6 +32,7 @@
     "axios": "^1.9.0",
     "cordova-plugin-file-opener2": "^4.0.0",
     "drizzle-orm": "^0.43.1",
+    "html5-qrcode": "^2.3.8",
     "ionicons": "^7.4.0",
     "jspdf": "^3.0.1",
     "qrcode": "^1.5.4",

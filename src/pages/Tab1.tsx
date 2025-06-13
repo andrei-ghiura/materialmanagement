@@ -3,12 +3,18 @@ import './Tab1.css';
 import labels from '../labels';
 import { add, qrCode } from 'ionicons/icons';
 import { Barcode, BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getAll, resetStore } from '../api/materials';
 import { useIonRouter, useIonViewWillEnter } from '@ionic/react';
 import { Material } from '../types';
 
+// Add import for html5-qrcode
+// @ts-ignore
+import { Html5Qrcode } from 'html5-qrcode';
 
+const isWeb = () => {
+  return !(window as any).Capacitor?.isNativePlatform?.();
+};
 
 const Tab1: React.FC = () => {
   const [, setisSupported] = useState(false)
@@ -23,6 +29,10 @@ const Tab1: React.FC = () => {
   lastWeeks.setDate(today.getDate() - 14);
   const [dateFrom, setDateFrom] = useState<string | null>(lastWeeks.toISOString().split('T')[0]);
   const [dateTo, setDateTo] = useState<string | null>(today.toISOString().split('T')[0]);
+  const [showWebQrModal, setShowWebQrModal] = useState(false);
+  const webQrRef = useRef<HTMLDivElement>(null);
+  const html5QrInstance = useRef<any>(null);
+
   useEffect(() => {
     BarcodeScanner.isSupported().then((result) => {
       setisSupported(result.supported);
@@ -30,6 +40,10 @@ const Tab1: React.FC = () => {
   }, []);
 
   const scan = async () => {
+    if (isWeb()) {
+      setShowWebQrModal(true);
+      return;
+    }
     const granted = await requestPermissions();
     if (!granted) {
       presentDenyAlert();
@@ -107,6 +121,77 @@ const Tab1: React.FC = () => {
     loadData();
   });
 
+  // Web QR code scan handler
+  useEffect(() => {
+    if (showWebQrModal && webQrRef.current) {
+      if (!html5QrInstance.current) {
+        html5QrInstance.current = new Html5Qrcode(webQrRef.current.id);
+      }
+      html5QrInstance.current
+        .start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: 250 },
+          async (decodedText: string) => {
+            html5QrInstance.current.stop();
+            setShowWebQrModal(false);
+            let id: string | null = null;
+            let rawValue = decodedText.trim();
+            try {
+              const data = JSON.parse(rawValue);
+              if (data && data.id) {
+                id = data.id;
+              }
+            } catch {
+              if (rawValue) {
+                id = rawValue;
+              }
+            }
+            if (id) {
+              const materials = await getAll();
+              const found = materials && materials.find((m: Material) => m.id === id);
+              if (found) {
+                router.push(`/material/${id}`, 'forward', 'push');
+                return;
+              } else {
+                await presentAlert({
+                  header: 'Material inexistent',
+                  message: 'Materialul scanat nu exista In aplicatie.' + id,
+                  buttons: ['OK'],
+                });
+                return;
+              }
+            }
+            await presentAlert({
+              header: 'QR invalid',
+              message: 'Codul QR scanat nu contine date valide de material.',
+              buttons: ['OK'],
+            });
+          },
+          (errorMessage: string) => {
+            // ignore errors
+          }
+        )
+        .catch(() => { });
+    }
+    return () => {
+      if (html5QrInstance.current) {
+        html5QrInstance.current.stop().catch(() => { });
+      }
+    };
+  }, [showWebQrModal]);
+
+  const closeWebQrModal = async () => {
+    setShowWebQrModal(false);
+    if (html5QrInstance.current) {
+      try {
+        await html5QrInstance.current.stop();
+      } catch (e) {
+        // Ignore errors if scanner is not running
+      }
+      html5QrInstance.current = null;
+    }
+  };
+
   return (
     <IonPage>
       <IonHeader>
@@ -182,6 +267,33 @@ const Tab1: React.FC = () => {
           <IonIcon ios={qrCode} md={qrCode}></IonIcon>
         </IonFabButton>
       </IonFab>
+      {/* Web QR Modal */}
+      {showWebQrModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0,0,0,0.8)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+          }}
+        >
+          <div
+            id="web-qr-reader"
+            ref={webQrRef}
+            style={{ width: 300, height: 300, background: '#000' }}
+          ></div>
+          <IonButton color="danger" onClick={closeWebQrModal}>
+            Închide
+          </IonButton>
+        </div>
+      )}
     </IonPage >
   );
 };
